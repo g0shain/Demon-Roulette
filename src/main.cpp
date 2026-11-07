@@ -4,6 +4,8 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/LevelInfoLayer.hpp>
+#include <Geode/modify/LevelBrowserLayer.hpp>
+#include <Geode/modify/EndLevelLayer.hpp>
 #include <Geode/ui/Notification.hpp>
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/ui/TextInput.hpp>
@@ -108,12 +110,30 @@ static int g_nextNum = 1;
 static int g_nextUid = 1;
 static int g_pendingUid = 0;          // игрок вышел из уровня, нужно проверить результат
 static bool g_leaveThenNext = false;  // «Next level» нажат внутри уровня
+static bool g_nextInfoByUs = false;   // следующая страница уровня открыта нашим модом
+static bool g_openingRunBrowser = false;  // открываем список уровней забега
+
+enum class PassKind { None, Next, Complete };
+static PassKind g_endKind = PassKind::None;   // окно, которое нужно показать на экране прохождения
+static int g_endUid = 0;
 
 static RunData* findRun(int uid) {
     for (auto& r : g_runs) if (r.uid == uid) return &r;
     return nullptr;
 }
 static RunData* activeRun() { return g_activeUid ? findRun(g_activeUid) : nullptr; }
+
+// Забег, к которому относится уровень (активный в приоритете)
+static RunData* runForLevel(int levelID) {
+    if (auto a = activeRun()) {
+        if (a->levelID == levelID) return a;
+    }
+    for (auto& r : g_runs) {
+        if (r.levelID == levelID) return &r;
+        for (auto& e : r.levels) if (e.id == levelID) return &r;
+    }
+    return nullptr;
+}
 
 static void saveAll() {
     std::string out;
@@ -194,12 +214,33 @@ static bool canSkip(RunData const& r) {
 
 // ======================= открытие уровня =======================
 
-// Все экраны мода и страницы уровней заменяют друг друга (replaceScene),
-// поэтому стек не растёт и из уровня хватает одного Esc до главного меню.
+template <class T>
+static int sceneDepth(T* d) {
+    if constexpr (requires { d->m_pobScenesStack->count(); }) return static_cast<int>(d->m_pobScenesStack->count());
+    else return 0;
+}
+
+// Показывает сцену так, чтобы в стеке остались только главное меню и она сама.
+// Тогда стек не растёт, а Esc идёт по цепочке:
+// страница уровня -> список уровней забега -> список забегов -> главное меню
+static void showScene(CCScene* scene) {
+    auto dir = CCDirector::get();
+    int depth = sceneDepth(dir);
+    if (depth >= 2) {
+        for (int i = depth; i > 2; --i) dir->popScene();
+        dir->replaceScene(scene);
+    } else if (depth == 1) {
+        dir->pushScene(scene);
+    } else {
+        dir->replaceScene(scene);
+    }
+}
+
 static void openLevelScene(GJGameLevel* level) {
-    CCDirector::get()->replaceScene(
-        CCTransitionFade::create(0.5f, LevelInfoLayer::scene(level, false))
-    );
+    g_nextInfoByUs = true;   // страница будет «нашей»: Esc с неё ведёт в список уровней забега
+    auto scene = LevelInfoLayer::scene(level, false);
+    g_nextInfoByUs = false;
+    showScene(CCTransitionFade::create(0.5f, scene));
 }
 
 // Открывает уровень, дождавшись окончания текущего перехода между сценами
@@ -222,6 +263,26 @@ static int demonFilterValue(int demon) {
         case 3: return 6;
         case 4: return 9;
         default: return 10;
+    }
+}
+
+// Звёзды рейтингового уровня
+template <class T>
+static int starsOf(T* l) {
+    if constexpr (requires { idOf(l->m_stars); }) return idOf(l->m_stars);
+    else return -1;
+}
+// Категория -> звёзды: Auto 1, Easy 2, Normal 3, Hard 4-5, Harder 6-7, Insane 8-9, Demon 10
+// (сервер смешивает Easy+Auto и Insane+Demon, поэтому проверяем по звёздам)
+static bool starsMatchCat(int cat, int stars) {
+    switch (cat) {
+        case 0: return stars == 1;
+        case 1: return stars == 2;
+        case 2: return stars == 3;
+        case 3: return stars == 4 || stars == 5;
+        case 4: return stars == 6 || stars == 7;
+        case 5: return stars == 8 || stars == 9;
+        default: return stars == 10;
     }
 }
 
@@ -365,6 +426,8 @@ private:
         for (auto lvl : CCArrayExt<GJGameLevel*>(levels)) {
             if (lvl->m_levelLength == 5) continue;                 // платформеры не подходят
             if (r->seen.count(idOf(lvl->m_levelID))) continue;     // повторы внутри забега
+            int stars = starsOf(lvl);
+            if (stars >= 0 && !starsMatchCat(m_cat, stars)) continue;   // не та сложность
             candidates.push_back(lvl);
             if (wanted >= 0 && demonDiffOf(lvl) == wanted) exact.push_back(lvl);
         }
@@ -430,8 +493,6 @@ static void goNext(int uid) {
         Fetcher::get()->beginRoll(uid);
     }
 }
-
-enum class PassKind { None, Next, Complete };
 
 // Меняет состояние забега сразу в момент прохождения (даже если игрок выйдет до появления окна)
 static PassKind markPassed(int uid) {
@@ -525,7 +586,10 @@ static void openRunLevels(int uid) {
     }
     if (!r->finished) { g_activeUid = uid; saveAll(); }
     auto obj = GJSearchObject::create(SearchType::MapPackOnClick, joinStr(ids, ','));
-    CCDirector::get()->replaceScene(CCTransitionFade::create(0.5f, LevelBrowserLayer::scene(obj)));
+    g_openingRunBrowser = true;
+    auto browser = LevelBrowserLayer::scene(obj);
+    g_openingRunBrowser = false;
+    showScene(CCTransitionFade::create(0.5f, browser));
 }
 
 // ======================= полоска «нужный процент» =======================
@@ -547,11 +611,14 @@ protected:
         bg->setColor({0, 0, 0});
         bg->setOpacity(125);
         this->addChild(bg);
+        // пропорции как у стандартной полоски GD
         m_fill->setAnchorPoint({0.f, 0.5f});
-        m_fill->setPosition({-m_bw / 2, 0.f});
+        m_fill->setScaleX(0.992f);
+        m_fill->setScaleY(0.86f);
+        m_fill->setPosition({-m_bw / 2 + 1.36f, 0.f});
         this->addChild(m_fill, 1);
         m_label = CCLabelBMFont::create("", "bigFont.fnt");
-        m_label->setScale(0.45f);
+        m_label->setScale(0.5f);
         this->addChild(m_label, 2);
         this->setScale(width / m_bw);
         return true;
@@ -568,7 +635,7 @@ public:
     void set(float ratio, std::string const& text) {
         ratio = std::clamp(ratio, 0.f, 1.f);
         m_fill->setTextureRect(CCRect(0.f, 0.f, std::max(0.1f, m_bw * ratio), m_bh));
-        m_fill->setColor(ratio >= 1.f ? ccColor3B{60, 255, 90} : ccColor3B{255, 215, 0});
+        m_fill->setColor(ccColor3B{0, 255, 0});
         m_label->setString(text.c_str());
     }
 };
@@ -598,6 +665,14 @@ static CCNode* hidePracticeBar(CCNode* root) {
     return first;
 }
 
+// Подпись над полоской, как «Normal Mode» у стандартной
+static void addBarTitle(CCNode* parent, CCPoint barPos) {
+    auto title = CCLabelBMFont::create("Demon Roulette", "bigFont.fnt");
+    title->setScale(0.32f);
+    title->setPosition({barPos.x, barPos.y + 14.f});
+    parent->addChild(title, 50);
+}
+
 // Ставит полоску на место прятанной полоски практики (или в запасную позицию)
 static NeedBar* attachBar(CCNode* host, RunData const& r, CCPoint fallback) {
     auto first = hidePracticeBar(host);
@@ -612,9 +687,11 @@ static NeedBar* attachBar(CCNode* host, RunData const& r, CCPoint fallback) {
     if (first && first->getParent()) {
         bar->setPosition(first->getPosition());
         first->getParent()->addChild(bar, 50);
+        addBarTitle(first->getParent(), bar->getPosition());
     } else {
         bar->setPosition(fallback);
         host->addChild(bar, 50);
+        addBarTitle(host, fallback);
     }
     return bar;
 }
@@ -629,12 +706,13 @@ static void setBtnScale(T* btn, float scale) {
 
 // Прячет стандартную полоску прогресса уровня, если она есть в биндингах
 template <class T>
-static bool hideVanillaBar(T* pl) {
-    if constexpr (requires { pl->m_progressBar->setVisible(false); }) {
-        pl->m_progressBar->setVisible(false);
-        return true;
+static CCNode* hideVanillaBar(T* pl) {
+    if constexpr (requires { static_cast<CCNode*>(pl->m_progressBar)->setVisible(false); }) {
+        auto n = static_cast<CCNode*>(pl->m_progressBar);
+        n->setVisible(false);
+        return n;
     } else {
-        return false;
+        return nullptr;
     }
 }
 
@@ -663,12 +741,18 @@ class $modify(RoulettePlay, PlayLayer) {
         if (!r || r->finished || r->levelID == 0) return;
         if (idOf(m_level->m_levelID) != r->levelID) return;
         auto win = CCDirector::get()->getWinSize();
-        bool replaced = hideVanillaBar(this);
+        CCNode* vanilla = hideVanillaBar(this);
         auto bar = NeedBar::create(220.f);
         if (!bar) return;
         setBarFromRun(bar, *r);
-        bar->setPosition({win.width / 2, win.height - (replaced ? 12.f : 32.f)});
-        m_uiLayer->addChild(bar, 100);
+        if (vanilla && vanilla->getParent()) {
+            // позиция и слой как у стандартной полоски, а размер свой (220), иначе выходит слишком большая
+            bar->setPosition(vanilla->getPosition());
+            vanilla->getParent()->addChild(bar, vanilla->getZOrder() + 1);
+        } else {
+            bar->setPosition({win.width / 2, win.height - 32.f});
+            m_uiLayer->addChild(bar, 100);
+        }
         m_fields->bar = bar;
     }
 
@@ -722,9 +806,9 @@ class $modify(RoulettePlay, PlayLayer) {
         if (r) record(r, 100);
         PlayLayer::levelComplete();
         if (r && r->best >= r->required) {
-            m_fields->pendingUid = r->uid;
-            m_fields->pendingKind = markPassed(r->uid);
-            schedulePrompt(2.0f, false);
+            // состояние обновляем сразу, а окно покажет экран прохождения, когда появится
+            g_endUid = r->uid;
+            g_endKind = markPassed(r->uid);
         }
     }
 
@@ -747,9 +831,51 @@ class $modify(RoulettePause, PauseLayer) {
     }
 };
 
+// Окно «Level passed» над экраном прохождения: показываем после того, как он
+// зарегистрировал нажатия, иначе его кнопки перехватывают клики
+class $modify(RouletteEnd, EndLevelLayer) {
+    void customSetup() {
+        EndLevelLayer::customSetup();
+        if (g_endKind != PassKind::None)
+            this->scheduleOnce(schedule_selector(RouletteEnd::showPass), 1.2f);
+    }
+
+    void showPass(float) {
+        auto kind = g_endKind;
+        g_endKind = PassKind::None;
+        PlatformToolbox::showCursor();
+        showPassPopup(g_endUid, kind);
+    }
+};
+
 class $modify(RouletteInfo, LevelInfoLayer) {
+    struct Fields {
+        bool byUs = false;
+    };
+
+    // Esc / стрелка назад: страница уровня -> список уровней забега
+    bool leaveToRunLevels() {
+        if (!m_fields->byUs) return false;
+        auto r = runForLevel(idOf(m_level->m_levelID));
+        if (!r) return false;
+        openRunLevels(r->uid);
+        return true;
+    }
+
+    void onBack(CCObject* sender) {
+        if (leaveToRunLevels()) return;
+        LevelInfoLayer::onBack(sender);
+    }
+
+    void keyBackClicked() {
+        if (leaveToRunLevels()) return;
+        LevelInfoLayer::keyBackClicked();
+    }
+
     bool init(GJGameLevel* level, bool challenge) {
         if (!LevelInfoLayer::init(level, challenge)) return false;
+        m_fields->byUs = g_nextInfoByUs;
+        g_nextInfoByUs = false;
 
         // «Next level» из уровня: продолжаем уже со страницы уровня
         if (g_leaveThenNext) {
@@ -901,7 +1027,7 @@ protected:
         float lx = (win.width - W) / 2, ly = (win.height - H) / 2 - 8.f;
 
         auto emptyView = CustomListView::create(CCArray::create(), static_cast<BoomListType>(0), H, W);
-        auto list = GJListLayer::create(emptyView, "Level Roulette", {194, 114, 62, 255}, W, H, 0);
+        auto list = GJListLayer::create(emptyView, "Demon Roulette", {194, 114, 62, 255}, W, H, 0);
         list->setPosition({lx, ly});
         this->addChild(list, 1);
 
@@ -1155,12 +1281,45 @@ public:
     }
 };
 
+// Список уровней забега: Esc / стрелка назад ведут в список забегов
+class $modify(RouletteBrowser, LevelBrowserLayer) {
+    struct Fields {
+        bool ours = false;
+    };
+
+    bool init(GJSearchObject* obj) {
+        if (!LevelBrowserLayer::init(obj)) return false;
+        if (g_openingRunBrowser) {
+            m_fields->ours = true;
+            g_openingRunBrowser = false;
+        }
+        return true;
+    }
+
+    bool leaveToRuns() {
+        if (!m_fields->ours) return false;
+        showScene(CCTransitionFade::create(0.5f, RouletteLayer::scene()));
+        return true;
+    }
+
+    void onBack(CCObject* sender) {
+        if (leaveToRuns()) return;
+        LevelBrowserLayer::onBack(sender);
+    }
+
+    void keyBackClicked() {
+        if (leaveToRuns()) return;
+        LevelBrowserLayer::keyBackClicked();
+    }
+};
+
 // ======================= кнопка в главном меню =======================
 
 class $modify(RouletteMenu, MenuLayer) {
     bool init() {
         if (!MenuLayer::init()) return false;
         g_leaveThenNext = false;
+        g_endKind = PassKind::None;
         auto menu = this->getChildByID("bottom-menu");
         auto spr = CircleButtonSprite::createWithSpriteFrameName(
             "diffIcon_06_btn_001.png", 1.0f, CircleBaseColor::Green, CircleBaseSize::Medium);

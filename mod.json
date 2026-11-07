@@ -5,7 +5,7 @@
     },
     "id": "g0shain.demon-roulette",
     "name": "Demon Roulette",
-    "version": "v0.9.0",
+    "version": "v0.9.1",
     "developer": "g0shain",
     "description": "Level roulette inside the game: runs, random demons and regular levels, skips, required-percent bars.",
     "settings": {
