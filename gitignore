@@ -1,0 +1,28 @@
+# Build output (CMake / Geode)
+build/
+build*/
+out/
+cmake-build-*/
+
+# Built mod packages (upload them to GitHub Releases instead)
+*.geode
+
+# CMake generated files
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+.cache/
+*.user
+*.suo
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
