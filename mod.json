@@ -1,0 +1,105 @@
+{
+    "geode": "5.11.2",
+    "gd": {
+        "win": "2.2081"
+    },
+    "id": "g0shain.demon-roulette",
+    "name": "Demon Roulette",
+    "version": "v0.9.0",
+    "developer": "g0shain",
+    "description": "Level roulette inside the game: runs, random demons and regular levels, skips, required-percent bars.",
+    "settings": {
+        "title-defaults": {
+            "type": "title",
+            "name": "Defaults for new runs (you can change them when creating a run)"
+        },
+        "step-from-required": {
+            "type": "bool",
+            "name": "Fixed +1 step",
+            "description": "OFF: the next level needs the percent you reached + 1 (needed 1%, got 2% -> next needs 3%). ON: the next level needs the previous REQUIRED percent + 1 (needed 1%, got 2% -> next needs 2%).",
+            "default": false
+        },
+        "skip-count": {
+            "type": "int",
+            "name": "Skips per run",
+            "description": "How many levels you may skip in a run (0 = skipping disabled).",
+            "default": 0,
+            "min": 0,
+            "max": 99
+        },
+        "skip-infinite": {
+            "type": "bool",
+            "name": "Infinite skips",
+            "default": false
+        },
+        "skip-adds-percent": {
+            "type": "bool",
+            "name": "Skip adds +1%",
+            "description": "ON: skipping a level at 10% moves you to 11%. OFF: you stay at 10%.",
+            "default": true
+        },
+        "title-normal": {
+            "type": "title",
+            "name": "Regular levels (non-demon)"
+        },
+        "lvl-auto": {
+            "type": "bool",
+            "name": "Auto",
+            "default": false
+        },
+        "lvl-easy": {
+            "type": "bool",
+            "name": "Easy",
+            "default": false
+        },
+        "lvl-normal": {
+            "type": "bool",
+            "name": "Normal",
+            "default": false
+        },
+        "lvl-hard": {
+            "type": "bool",
+            "name": "Hard",
+            "default": false
+        },
+        "lvl-harder": {
+            "type": "bool",
+            "name": "Harder",
+            "default": false
+        },
+        "lvl-insane": {
+            "type": "bool",
+            "name": "Insane",
+            "default": false
+        },
+        "title-demons": {
+            "type": "title",
+            "name": "Demons"
+        },
+        "demon-easy": {
+            "type": "bool",
+            "name": "Easy Demon",
+            "default": true
+        },
+        "demon-medium": {
+            "type": "bool",
+            "name": "Medium Demon",
+            "default": true
+        },
+        "demon-hard": {
+            "type": "bool",
+            "name": "Hard Demon",
+            "default": true
+        },
+        "demon-insane": {
+            "type": "bool",
+            "name": "Insane Demon",
+            "default": true
+        },
+        "demon-extreme": {
+            "type": "bool",
+            "name": "Extreme Demon",
+            "default": true
+        }
+    }
+}
