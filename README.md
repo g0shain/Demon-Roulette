@@ -107,7 +107,7 @@ The SDK version must match the Geode version in the game (5.11.2), and `mod.json
 - If a roll fails, press **Enter** on the run to try again.
 - This is an unofficial fan-made mod and is not affiliated with RobTop Games.
 
-Made by **g0shain**.
+Made by **g0shain and Claude :)**.
 
 ---
 
@@ -203,4 +203,4 @@ geode build --ninja
 - Если бросок не удался, нажмите **Enter** у забега, чтобы повторить.
 - Это неофициальный фанатский мод, он не связан с RobTop Games.
 
-Автор: **g0shain**.
+Автор: **g0shain и Claude :)**.
