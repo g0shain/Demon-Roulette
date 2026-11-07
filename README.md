@@ -28,6 +28,14 @@
 
 > The mod targets exactly Geode 5.11.2 and GD 2.2081. Other versions are not tested.
 
+> [!WARNING]
+> ### Geometry Dash 2.209 is NOT supported yet
+> This mod was built for **Geometry Dash 2.2081** and **Geode 5.11.2**.
+>
+> Geometry Dash 2.209 has already been released, but Geode for 2.209 (Geode v6) is not stable yet, so this mod is **not expected to work on 2.209** for now. It has not been tested there.
+>
+> The mod is planned to be updated once Geode for the new game version is stable and released. Until then, please stay on **GD 2.2081** if you want to use it, and please do not report problems that appear on 2.209.
+
 ### What is it?
 
 Demon Roulette gives you a random level, you have to reach a required percent in it, and then you get the next random level with a higher required percent. A series of such levels is called a **run**.
@@ -124,6 +132,14 @@ Made by **g0shain and Claude :)**.
 
 > Мод рассчитан именно на Geode 5.11.2 и GD 2.2081. На других версиях не проверялся.
 
+> [!WARNING]
+> ### Geometry Dash 2.209 пока НЕ поддерживается
+> Этот мод собран для **Geometry Dash 2.2081** и **Geode 5.11.2**.
+>
+> Geometry Dash 2.209 уже вышла, но Geode для 2.209 (Geode v6) ещё не стабилен, поэтому мод на 2.209 **пока работать не должен**. Там он не проверялся.
+>
+> Мод планируется обновить, когда Geode для новой версии игры станет стабильным и выйдет. До тех пор, если хотите им пользоваться, оставайтесь на **GD 2.2081** и не сообщайте о проблемах, которые появляются на 2.209.
+
 ### Что это?
 
 Demon Roulette выдаёт случайный уровень, в котором нужно набрать заданный процент, а затем следующий случайный уровень с более высоким требованием. Серия таких уровней называется **забегом** (run).
@@ -203,4 +219,4 @@ geode build --ninja
 - Если бросок не удался, нажмите **Enter** у забега, чтобы повторить.
 - Это неофициальный фанатский мод, он не связан с RobTop Games.
 
-Автор: **g0shain и Claude :)**.
+Сделано **g0shain и Claude :)**.
