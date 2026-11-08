@@ -12,6 +12,8 @@
  * Skip / Next level button on the level page moved under the back arrow
  * Fixed run buttons disappearing when scrolling the runs list up
  * Fixed buttons not shrinking back after being pressed
+ * Added ? buttons next to Skip adds +1% and Fixed +1 step when creating a run; press them to see what the option does
+ * Added a Give up button on the level page (under Skip) and in the level list of a run
 
 # v0.9.0
 

@@ -27,7 +27,7 @@ A level roulette built right into the game. You get a random level, reach the re
   - fixed +1 step
 - Configurable skips, finite or infinite
 - A required-percent bar in the GD style at the top of the level, on the level page and in the pause menu
-- Skip / Next level button right on the level page
+- Skip / Next level and Give up buttons right on the level page; Give up is also in the level list
 - Esc goes level page, level list, runs list, main menu
 
 ## How percent is counted

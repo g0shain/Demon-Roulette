@@ -112,6 +112,7 @@ static int g_pendingUid = 0;          // игрок вышел из уровня
 static bool g_leaveThenNext = false;  // «Next level» нажат внутри уровня
 static bool g_nextInfoByUs = false;   // следующая страница уровня открыта нашим модом
 static bool g_openingRunBrowser = false;  // открываем список уровней забега
+static int g_openingRunUid = 0;
 
 enum class PassKind { None, Next, Complete };
 static PassKind g_endKind = PassKind::None;   // окно, которое нужно показать на экране прохождения
@@ -587,9 +588,33 @@ static void openRunLevels(int uid) {
     if (!r->finished) { g_activeUid = uid; saveAll(); }
     auto obj = GJSearchObject::create(SearchType::MapPackOnClick, joinStr(ids, ','));
     g_openingRunBrowser = true;
+    g_openingRunUid = uid;
     auto browser = LevelBrowserLayer::scene(obj);
     g_openingRunBrowser = false;
     showScene(CCTransitionFade::create(0.5f, browser));
+}
+
+static void giveUpRun(int uid) {
+    auto r = findRun(uid);
+    if (!r || r->finished) return;
+    if (!r->awaiting && r->levelID != 0)
+        r->levels.push_back({r->levelID, r->levelName, r->diffName, r->required, r->best, "failed"});
+    r->finished = true;
+    r->result = "gave up";
+    if (g_activeUid == uid) g_activeUid = 0;
+    saveAll();
+}
+
+// Подтверждение; после сдачи показываем список уровней забега
+static void confirmGiveUp(int uid) {
+    auto r = findRun(uid);
+    if (!r || r->finished) return;
+    createQuickPopup("Give up?", "End this run? It stays in the list as finished.", "No", "Yes",
+        [uid](FLAlertLayer*, bool yes) {
+            if (!yes) return;
+            giveUpRun(uid);
+            openRunLevels(uid);
+        });
 }
 
 // ======================= полоска «нужный процент» =======================
@@ -900,18 +925,22 @@ class $modify(RouletteInfo, LevelInfoLayer) {
             label = r->infSkips ? "Skip" : fmt::format("Skip ({})", r->skipLimit - r->skipsUsed);
             tag = 1;
         }
-        if (tag) {
-            auto spr = ButtonSprite::create(label.c_str());
-            auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(RouletteInfo::onRouletteBtn));
-            btn->setTag(tag);
-            auto menu = CCMenu::create();
-            menu->setPosition({0, 0});
+        auto menu = CCMenu::create();
+        menu->setPosition({0, 0});
+        float by = win.height - 62.f;
+        auto addBtn = [&](std::string const& text, int t) {
+            auto btn = CCMenuItemSpriteExtra::create(ButtonSprite::create(text.c_str()), this,
+                menu_selector(RouletteInfo::onRouletteBtn));
+            btn->setTag(t);
             setBtnScale(btn, 0.6f);
             float bw = btn->getScaledContentWidth();
-            btn->setPosition({8.f + bw / 2, win.height - 62.f});   // левый край прижат к краю экрана
+            btn->setPosition({8.f + bw / 2, by});   // левый край прижат к краю экрана
             menu->addChild(btn);
-            this->addChild(menu, 60);
-        }
+            by -= 30.f;
+        };
+        if (tag) addBtn(label, tag);
+        addBtn("Give up", 3);
+        this->addChild(menu, 60);
 
         if (g_pendingUid == r->uid)
             this->scheduleOnce(schedule_selector(RouletteInfo::showResult), 0.6f);
@@ -934,6 +963,7 @@ class $modify(RouletteInfo, LevelInfoLayer) {
         int tag = static_cast<CCNode*>(sender)->getTag();
         if (tag == 1) confirmSkip(g_activeUid);
         else if (tag == 2) goNext(g_activeUid);
+        else if (tag == 3) confirmGiveUp(g_activeUid);
     }
 };
 
@@ -1103,7 +1133,8 @@ protected:
     }
 
     // ---------- создание забега ----------
-    void addToggle(CCMenu* menu, float x, float y, char const* text, bool on, int tag, SEL_MenuHandler cb) {
+    // info >= 0 добавляет рядом кнопку «?», по нажатию объясняющую функцию
+    void addToggle(CCMenu* menu, float x, float y, char const* text, bool on, int tag, SEL_MenuHandler cb, int info = -1) {
         auto t = CCMenuItemToggler::createWithStandardSprites(this, cb, 0.55f);
         t->setPosition({x, y});
         t->setTag(tag);
@@ -1114,6 +1145,33 @@ protected:
         label->setScale(0.4f);
         label->setPosition({x + 16.f, y});
         this->addChild(label, 6);
+
+        if (info >= 0) {
+            // обычная кнопка игры с буквой «?» (отдельной иконки вопроса в игре нет)
+            auto b = CCMenuItemSpriteExtra::create(ButtonSprite::create("?"), this, menu_selector(RouletteLayer::onInfo));
+            b->setTag(info);
+            setBtnScale(b, 0.5f);
+            b->setPosition({x + 16.f + label->getScaledContentWidth() + 16.f, y});
+            menu->addChild(b);
+        }
+    }
+
+    void onInfo(CCObject* sender) {
+        int i = static_cast<CCNode*>(sender)->getTag();
+        char const* title = "";
+        std::string text;
+        if (i == 1) {
+            title = "Skip adds +1%";
+            text = "ON: skipping a level raises the requirement by 1%\n(skip at 10% -> the next level needs 11%).\n"
+                   "OFF: the requirement stays the same (10%).";
+        } else if (i == 2) {
+            title = "Fixed +1 step";
+            text = "OFF: the next level needs the percent you reached + 1\n(needed 1%, got 2% -> next needs 3%).\n"
+                   "ON: the next level needs the previous requirement + 1,\nno matter how much you got\n(needed 1%, got 2% -> next needs 2%).";
+        } else {
+            return;
+        }
+        createQuickPopup(title, text, "OK", nullptr, [](FLAlertLayer*, bool) {});
     }
 
     std::string skipText() const {
@@ -1166,8 +1224,8 @@ protected:
         addButton(menu, "-", menu_selector(RouletteLayer::onSkipDelta), {ox + 135.f, top - 28.f}, 0.5f, -1);
         addButton(menu, "+", menu_selector(RouletteLayer::onSkipDelta), {ox + 160.f, top - 28.f}, 0.5f, 1);
         addToggle(menu, ox + 8.f, top - 58.f, "Infinite skips", m_inf, 0, menu_selector(RouletteLayer::onOpt));
-        addToggle(menu, ox + 8.f, top - 85.f, "Skip adds +1%", m_skipAdds, 1, menu_selector(RouletteLayer::onOpt));
-        addToggle(menu, ox + 8.f, top - 112.f, "Fixed +1 step", m_fixed, 2, menu_selector(RouletteLayer::onOpt));
+        addToggle(menu, ox + 8.f, top - 85.f, "Skip adds +1%", m_skipAdds, 1, menu_selector(RouletteLayer::onOpt), 1);
+        addToggle(menu, ox + 8.f, top - 112.f, "Fixed +1 step", m_fixed, 2, menu_selector(RouletteLayer::onOpt), 2);
 
         addButton(menu, "Create", menu_selector(RouletteLayer::onConfirmCreate), {win.width / 2 - 60.f, 24.f}, 0.9f);
         addButton(menu, "Cancel", menu_selector(RouletteLayer::onCancel), {win.width / 2 + 60.f, 24.f}, 0.9f);
@@ -1285,16 +1343,33 @@ public:
 class $modify(RouletteBrowser, LevelBrowserLayer) {
     struct Fields {
         bool ours = false;
+        int uid = 0;
     };
 
     bool init(GJSearchObject* obj) {
         if (!LevelBrowserLayer::init(obj)) return false;
         if (g_openingRunBrowser) {
             m_fields->ours = true;
+            m_fields->uid = g_openingRunUid;
             g_openingRunBrowser = false;
+
+            auto r = findRun(m_fields->uid);
+            if (r && !r->finished) {
+                auto btn = CCMenuItemSpriteExtra::create(ButtonSprite::create("Give up"), this,
+                    menu_selector(RouletteBrowser::onRouletteGiveUp));
+                setBtnScale(btn, 0.6f);
+                float bw = btn->getScaledContentWidth();
+                btn->setPosition({8.f + bw / 2, 170.f});
+                auto menu = CCMenu::create();
+                menu->setPosition({0, 0});
+                menu->addChild(btn);
+                this->addChild(menu, 60);
+            }
         }
         return true;
     }
+
+    void onRouletteGiveUp(CCObject*) { confirmGiveUp(m_fields->uid); }
 
     bool leaveToRuns() {
         if (!m_fields->ours) return false;

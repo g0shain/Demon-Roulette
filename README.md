@@ -52,7 +52,7 @@ The first level needs 1%. After you reach the required percent, the next level n
 - **Skips.** Set a number of skips for a run or make them infinite. A skip can either add +1% to the requirement (default) or keep it unchanged.
 - **Pass window inside the level.** After a death with the required percent reached, the game pauses and a window with *Later* / *Next level* appears. Closing the window never loses your progress.
 - **Required-percent bar in the GD style.** It is shown at the top of the level (instead of the standard progress bar), on the level page and in the pause menu (instead of the practice bar).
-- **Skip / Next level button** right on the level page, under the back arrow.
+- **Skip / Next level and Give up buttons** right on the level page, under the back arrow. Give up is also in the level list of a run.
 - **Real GD level list.** *Enter* on a run opens the standard level browser with all levels of that run: the current one on top, the passed ones below (the lowest one is the 1% level), so you can open any previous level at any time.
 - **One Esc to the main menu.** Mod screens and level pages replace each other instead of piling up in the scene stack.
 
@@ -156,7 +156,7 @@ Demon Roulette выдаёт случайный уровень, в котором
 - **Скипы.** Задайте число скипов для забега или сделайте их бесконечными. Скип либо добавляет +1% к требованию (по умолчанию), либо оставляет его прежним.
 - **Окно прохождения внутри уровня.** После смерти с набранным нужным процентом игра ставится на паузу и появляется окно *Later* / *Next level*. Закрытие окна никогда не сбрасывает прогресс.
 - **Полоска нужного процента в стиле GD.** Показывается сверху в уровне (вместо стандартной полоски прогресса), на странице уровня и в паузе (вместо полоски практики).
-- **Кнопка Skip / Next level** прямо на странице уровня, под стрелкой назад.
+- **Кнопки Skip / Next level и Give up** прямо на странице уровня, под стрелкой назад. Give up есть и в списке уровней забега.
 - **Настоящий список уровней GD.** Кнопка *Enter* у забега открывает стандартный браузер уровней со всеми уровнями забега: сверху текущий, ниже пройденные (самый нижний на 1%). Так в любой момент можно зайти в любой предыдущий уровень.
 - **Один Esc до главного меню.** Экраны мода и страницы уровней заменяют друг друга и не накапливаются в стеке сцен.
 
