@@ -5,8 +5,12 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 project(DemonRoulette VERSION 1.0.0)
 
-file(GLOB SOURCES src/*.cpp)
+# Все .cpp из src и вложенных папок
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
+
+# Чтобы можно было писать #include "core/Data.hpp"
+target_include_directories(${PROJECT_NAME} PRIVATE src)
 
 if (NOT DEFINED ENV{GEODE_SDK})
     message(FATAL_ERROR "Переменная окружения GEODE_SDK не задана")
